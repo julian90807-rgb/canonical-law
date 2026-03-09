@@ -206,26 +206,6 @@
 </header>
 <div class="gold-bar"></div>
 
-<!-- SETUP -->
-<div class="setup-wrap">
-  <details id="setup-det">
-    <summary>⚙ Подключение Google Apps Script</summary>
-    <div class="setup-body">
-      <p>Страница работает через Google Apps Script — данные хранятся в вашей Google Таблице и отображаются здесь публично. Настройка делается один раз.</p>
-      <ol>
-        <li>Создайте новую Google Таблицу</li>
-        <li>Откройте <code>Расширения → Apps Script</code> и вставьте код из файла <strong>apps_script.gs</strong></li>
-        <li>Нажмите <code>Развернуть → Новое развёртывание</code> → тип: <code>Веб-приложение</code> → выполнять как: <code>Я</code> → доступ: <code>Все</code></li>
-        <li>Скопируйте URL развёртывания, вставьте ниже и нажмите <strong>Сохранить</strong></li>
-      </ol>
-      <div class="url-row">
-        <input type="text" id="script-url" placeholder="https://script.google.com/macros/s/.../exec">
-        <button class="btn-save" onclick="saveUrl()">Сохранить</button>
-      </div>
-    </div>
-  </details>
-</div>
-
 <!-- MAIN -->
 <div class="outer">
   <div class="cols">
@@ -344,12 +324,12 @@
 </div>
 
 <footer>
-  <p><span>Каноническое право</span> · ДВФУ, Кафедра теологии · Преподаватель: <span>Руснак А.Г.</span> · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="a9dbdcdac7c8c287c8cee9cddfcfdc87dbdc">[email&#160;protected]</a></p>
+  <p><span>Каноническое право</span> · ДВФУ, Кафедра теологии · Преподаватель: <span>Руснак А.Г.</span></p>
 </footer>
 
-<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+<script>
 // ── ВСТАВЬТЕ URL APPS SCRIPT ПЕРЕД ПУБЛИКАЦИЕЙ НА GITHUB ──
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwDXwIYWF2IHxEq2YkJrBcGPqUtB5gaa3R7ZwoQ4Z6zQkai854iTld9jKQ6VjgNw7Xirw/exec';
+const SCRIPT_URL = '';
 // ──────────────────────────────────────────────────────────
 const PER_PAGE = 5;
 let qAll = [], rAll = [], qShown = PER_PAGE, rShown = PER_PAGE;
@@ -502,4 +482,29 @@ async function submitForm(t) {
 }
 
 function resetForm(t) {
-  const ids = t==='q' ? ['name-q','text-q','topic-q'] : ['name-r','pro
+  const ids = t==='q' ? ['name-q','text-q','topic-q'] : ['name-r','pro  const ids = t==='q' ? ['name-q','text-q','topic-q'] : ['name-r','pro-r','con-r','suggest-r'];
+  ids.forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  if(t==='r') document.querySelectorAll('.stars input').forEach(i=>i.checked=false);
+}
+
+function setBtn(t, loading) {
+  const btn = document.getElementById('btn-'+t);
+  if (!btn) return;
+  btn.disabled = loading;
+  btn.textContent = loading ? 'Отправка…' : (t==='q' ? 'Задать вопрос' : 'Отправить отзыв');
+}
+
+function showMsg(t, type, text) {
+  const el = document.getElementById('msg-'+t);
+  if (!el) return;
+  el.className = 'msg ' + type;
+  el.textContent = text;
+  setTimeout(() => { el.className='msg'; el.textContent=''; }, 5000);
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
