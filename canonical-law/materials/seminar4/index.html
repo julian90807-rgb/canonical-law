@@ -52,31 +52,79 @@
     </a>
     <div class="h-eyebrow">ДВФУ · Кафедра теологии · Каноническое право</div>
     <div class="h-tag">Семинар</div>
-    <h1>Семинар 4. Имущественные права Церкви</h1>
-    <p class="h-desc">Содержание духовенства. Церковная собственность.</p>
+    <h1 id="sem-title">Загрузка…</h1>
+    <p class="h-desc" id="sem-desc"></p>
   </div>
 </header>
 <main>
   <div class="section-title">Материалы для скачивания</div>
-  <div class="files">
-
-    <a class="file-card" href="zadanie.docx" download>
-      <div class="file-icon doc">📝</div>
-      <div class="file-info">
-        <div class="file-name">Задание к семинару</div>
-        <div class="file-meta">DOCX · 14 КБ</div>
-      </div>
-      <div class="file-dl">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        <span>Скачать</span>
-      </div>
-    </a>
-
-  </div>
+  <div class="files" id="sem-files"></div>
 </main>
 <footer>
   <p><span>Каноническое право</span> · ДВФУ, Кафедра теологии · Преподаватель: <span data-inst="name_short">Руснак А.Г.</span></p>
 </footer>
 <script src="https://julian90807-rgb.github.io/dvfu/shared/instructor.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script>
+(function() {
+  var SEMINARS_URL = 'https://julian90807-rgb.github.io/dvfu/canonical-law/data/seminars.csv';
+
+  // определяем номер семинара из URL
+  var match = window.location.pathname.match(/seminar(\d+)/);
+  var semNum = match ? parseInt(match[1]) : null;
+
+  if (!semNum) return;
+
+  Papa.parse(SEMINARS_URL, {
+    download: true,
+    header: true,
+    skipEmptyLines: true,
+    complete: function(results) {
+      var rows = results.data.filter(function(r) {
+        return parseInt(r['№']) === semNum;
+      });
+      if (!rows.length) return;
+
+      var first = rows[0];
+      var titleEl = document.getElementById('sem-title');
+      var descEl  = document.getElementById('sem-desc');
+      var filesEl = document.getElementById('sem-files');
+
+      if (titleEl) titleEl.textContent = 'Семинар ' + semNum + '. ' + first['Название'];
+      if (descEl)  descEl.textContent  = first['Описание'];
+      document.title = 'Семинар ' + semNum + ' — Каноническое право';
+
+      if (filesEl) {
+        filesEl.innerHTML = '';
+        rows.forEach(function(row) {
+          var file = (row['Файл'] || '').trim();
+          var name = (row['Название файла'] || file).trim();
+          if (!file) return;
+
+          var ext = file.split('.').pop().toLowerCase();
+          var icon = ext === 'pdf' ? '📄' : '📝';
+          var iconClass = ext === 'pdf' ? 'pdf' : 'doc';
+
+          var a = document.createElement('a');
+          a.className = 'file-card';
+          a.href = file;
+          a.download = '';
+          a.innerHTML =
+            '<div class="file-icon ' + iconClass + '">' + icon + '</div>' +
+            '<div class="file-info">' +
+              '<div class="file-name">' + name + '</div>' +
+              '<div class="file-meta">' + ext.toUpperCase() + '</div>' +
+            '</div>' +
+            '<div class="file-dl">' +
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>' +
+              '<span>Скачать</span>' +
+            '</div>';
+          filesEl.appendChild(a);
+        });
+      }
+    }
+  });
+})();
+</script>
 </body>
 </html>
