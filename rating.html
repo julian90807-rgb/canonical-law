@@ -374,6 +374,32 @@
     .thresholds { gap: 8px; }
     .threshold-card { padding: 10px 14px; }
   }
+
+  /* SITE NAV */
+  .site-nav {
+    background: var(--navy);
+    border-bottom: 2px solid rgba(200,150,42,.25);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .nav-inner {
+    max-width: 1000px; margin: 0 auto; padding: 0 24px;
+    display: flex; gap: 0; overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .nav-inner::-webkit-scrollbar { display: none; }
+  .nav-link {
+    display: block; padding: 11px 16px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 10px; font-weight: 600;
+    letter-spacing: .09em; text-transform: uppercase;
+    color: rgba(255,255,255,.55);
+    text-decoration: none; white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: color .2s, border-color .2s;
+  }
+  .nav-link:hover { color: rgba(255,255,255,.9); }
+  .nav-link.active { color: var(--gold); border-bottom-color: var(--gold); }
 </style>
 </head>
 <body>
@@ -402,6 +428,17 @@
     </div>
   </div>
 </header>
+<nav class="site-nav">
+  <div class="nav-inner">
+    <a href="https://julian90807-rgb.github.io/canonical-law/" class="nav-link" data-page="home">О курсе</a>
+    <a href="https://julian90807-rgb.github.io/canonical-law/topics.html" class="nav-link" data-page="topics">Занятия</a>
+    <a href="https://julian90807-rgb.github.io/canonical-law/rating.html" class="nav-link" data-page="rating">Рейтинг</a>
+    <a href="https://julian90807-rgb.github.io/canonical-law/library/" class="nav-link" data-page="library">Библиотека</a>
+    <a href="https://julian90807-rgb.github.io/canonical-law/glossary/" class="nav-link" data-page="glossary">Глоссарий</a>
+    <a href="https://julian90807-rgb.github.io/canonical-law/feedback.html" class="nav-link" data-page="feedback">Вопросы и отзывы</a>
+    <a href="https://julian90807-rgb.github.io/canonical-law/submission.html" class="nav-link" data-page="submission">Сдача работ</a>
+  </div>
+</nav>
 <div class="gold-bar"></div>
 
 <!-- ════════════════════ LEGEND ════════════════════ -->
@@ -430,8 +467,22 @@
   </div>
 </div>
 
+<!-- ════════════════════ ПИН-ЭКРАН ════════════════════ -->
+<div id="pin-screen" style="max-width:480px;margin:48px auto;padding:0 24px">
+  <div style="background:#fff;border:1px solid var(--border);border-radius:16px;padding:36px 32px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.07)">
+    <div style="font-size:36px;margin-bottom:16px">🔐</div>
+    <h2 style="font-family:'Playfair Display',serif;font-size:22px;color:var(--navy);margin-bottom:8px">Ваш рейтинг</h2>
+    <p style="font-size:13px;color:#888;line-height:1.6;margin-bottom:24px">Введите пин-код, который вам сообщил преподаватель</p>
+    <input type="text" id="pin-input" maxlength="4" inputmode="numeric" pattern="[0-9]*"
+      placeholder="_ _ _ _"
+      style="width:100%;text-align:center;font-size:28px;font-family:'Playfair Display',serif;letter-spacing:.3em;padding:14px;border:2px solid var(--border);border-radius:10px;outline:none;background:var(--cream);color:var(--navy);transition:border-color .2s"
+      oninput="this.value=this.value.replace(/\D/g,'');if(this.value.length===4)checkPin(this.value)">
+    <div id="pin-error" style="display:none;margin-top:12px;font-size:12px;color:#b91c1c;font-weight:600">Пин-код не найден. Проверьте номер билета.</div>
+  </div>
+</div>
+
 <!-- ════════════════════ ТАБЛИЦА ════════════════════ -->
-<div class="table-wrap">
+<div class="table-wrap" id="rating-section" style="display:none">
   <div class="table-header">
     <div class="table-title">Список студентов</div>
     <div id="status-msg"></div>
@@ -476,33 +527,83 @@
 <script>
 const SHEET_URL = 'https://julian90807-rgb.github.io/canonical-law/data/rating.csv';
 
+let allData = [];
+
 window.addEventListener('DOMContentLoaded', function() {
+  // Сначала загружаем данные в фоне, показываем пин-экран
   loadData();
+  document.getElementById('pin-input').focus();
 });
 
 function loadData() {
-  const url = SHEET_URL;
-  if (!url) return;
+  Papa.parse(SHEET_URL, {
+    download: true,
+    header: true,
+    skipEmptyLines: true,
+    complete: function(results) {
+      allData = results.data;
+    },
+    error: function() {
+      allData = null;
+    }
+  });
+}
+
+function checkPin(pin) {
+  if (allData === null) {
+    document.getElementById('pin-error').style.display = 'block';
+    document.getElementById('pin-error').textContent = 'Не удалось загрузить данные. Проверьте соединение.';
+    return;
+  }
+  if (allData.length === 0) {
+    // Данные ещё грузятся — подождать
+    setTimeout(function() { checkPin(pin); }, 500);
+    return;
+  }
+  const colPin = detectCol(allData[0], ['пин','pin','билет','ticket','код']);
+  if (!colPin) {
+    // Нет колонки пин — показываем всем (режим без пина)
+    showRating(allData, null);
+    return;
+  }
+  const row = allData.find(function(r) {
+    return String(r[colPin] || '').trim() === pin;
+  });
+  if (!row) {
+    document.getElementById('pin-error').style.display = 'block';
+    document.getElementById('pin-input').style.borderColor = '#b91c1c';
+    document.getElementById('pin-input').value = '';
+    setTimeout(function() {
+      document.getElementById('pin-input').style.borderColor = '';
+      document.getElementById('pin-error').style.display = 'none';
+    }, 3000);
+    return;
+  }
+  showRating(allData, row);
+}
+
+function showRating(data, myRow) {
+  document.getElementById('pin-screen').style.display = 'none';
+  document.getElementById('rating-section').style.display = '';
+  renderTable(data, myRow);
+  document.getElementById('last-update-time').textContent = new Date().toLocaleString('ru-RU', {
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+  });
+  document.getElementById('status-msg').textContent = data.length + ' студентов';
+}
+
+function loadData_refresh() {
   const btn = document.getElementById('btn-refresh');
   btn.classList.add('spinning');
-  document.getElementById('status-msg').textContent = 'Загрузка…';
-
-  Papa.parse(url, {
+  Papa.parse(SHEET_URL, {
     download: true,
     header: true,
     skipEmptyLines: true,
     complete: function(results) {
       btn.classList.remove('spinning');
-      if (!results.data.length) {
-        showError('Таблица пуста.');
-        return;
-      }
-      renderTable(results.data);
-      document.getElementById('last-update-time').textContent = new Date().toLocaleString('ru-RU', {
-        day: '2-digit', month: '2-digit', year: 'numeric',
-        hour: '2-digit', minute: '2-digit'
-      });
-      document.getElementById('status-msg').textContent = results.data.length + ' студентов';
+      allData = results.data;
+      const pin = sessionStorage.getItem('rating_pin');
+      if (pin) checkPin(pin);
     },
     error: function() {
       btn.classList.remove('spinning');
@@ -541,7 +642,7 @@ function parseNum(v) {
   return isNaN(n) ? null : n;
 }
 
-function renderTable(data) {
+function renderTable(data, myRow) {
   if (!data.length) { showError('Таблица пуста.'); return; }
 
   const sample     = data[0];
@@ -596,7 +697,9 @@ function renderTable(data) {
       return '<td class="score-cell"><span class="score ' + cls + '">' + val.toFixed(1) + '%</span></td>';
     }
 
+    const isMe = myRow && row === myRow;
     const tr = document.createElement('tr');
+    if (isMe) tr.style.cssText = 'background:rgba(200,150,42,.08);outline:2px solid var(--gold);outline-offset:-2px;';
     tr.innerHTML =
       '<td class="col-rank">' + rank + '</td>' +
       '<td class="col-name">' + fio + '</td>' +
@@ -610,5 +713,23 @@ function renderTable(data) {
   });
 }
 </script>
+
+  // Mark active nav link
+  (function(){
+    var path = window.location.href;
+    document.querySelectorAll('.nav-link').forEach(function(a){
+      var pg = a.dataset.page;
+      var patterns = {
+        home:       /canonical-law\/?(\?|#|$)/,
+        topics:     /topics/,
+        rating:     /rating/,
+        library:    /library/,
+        glossary:   /glossary/,
+        feedback:   /feedback/,
+        submission: /submission/
+      };
+      if(patterns[pg] && patterns[pg].test(path)) a.classList.add('active');
+    });
+  })();
 </body>
 </html>

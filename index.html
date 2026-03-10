@@ -101,11 +101,13 @@
     font-family: 'Playfair Display', serif;
     font-size: clamp(38px, 5vw, 58px);
     font-weight: 700;
-    font-style: normal;
     color: #fff;
-    line-height: 1.15;
+    line-height: 1.1;
     margin-bottom: 22px;
-    letter-spacing: -0.5px;
+  }
+  .hero h1 em {
+    font-style: italic;
+    color: var(--gold-light);
   }
 
   .hero-meta {
@@ -144,8 +146,8 @@
     backdrop-filter: blur(4px);
   }
   .teacher-avatar {
-    width: 150px;
-    height: 190px;
+    width: 110px;
+    height: 140px;
     border-radius: 8px;
     overflow: hidden;
     margin: 0 auto 18px;
@@ -153,11 +155,9 @@
     box-shadow: 0 8px 24px rgba(0,0,0,.4);
   }
   .teacher-avatar img {
-    width: 100%;
-    height: 100%;
+    width: 100%; height: 100%;
     object-fit: cover;
-    object-position: 50% 30%;
-    display: block;
+    object-position: center top;
   }
   .teacher-name {
     font-family: 'Playfair Display', serif;
@@ -635,6 +635,32 @@
   .hero-left > *:nth-child(2) { animation-delay: .25s; }
   .hero-left > *:nth-child(3) { animation-delay: .4s; }
   .teacher-card { animation: fadeUp .7s .5s ease both; }
+
+  /* SITE NAV */
+  .site-nav {
+    background: var(--navy);
+    border-bottom: 2px solid rgba(200,150,42,.25);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .site-nav .nav-inner {
+    max-width: 1100px; margin: 0 auto; padding: 0 24px;
+    display: flex; gap: 0; overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .site-nav .nav-inner::-webkit-scrollbar { display: none; }
+  .site-nav .nav-link {
+    display: block; padding: 11px 16px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 10px; font-weight: 600;
+    letter-spacing: .09em; text-transform: uppercase;
+    color: rgba(255,255,255,.55);
+    text-decoration: none; white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: color .2s, border-color .2s;
+  }
+  .site-nav .nav-link:hover { color: rgba(255,255,255,.9); }
+  .site-nav .nav-link.active { color: var(--gold-light); border-bottom-color: var(--gold); }
 </style>
 </head>
 <body>
@@ -647,7 +673,7 @@
       <div class="hero-discipline">
         ДВФУ · Кафедра теологии · Учебная дисциплина
       </div>
-      <h1>Каноническое право</h1>
+      <h1>Каноническое<br><em>право</em></h1>
       <div class="hero-meta">
         <div class="hero-badge">
           <span>10</span>занятий
@@ -674,11 +700,22 @@
       <div class="teacher-contacts">
         <a href="mailto:rusnak.ag@dvfu.ru">rusnak.ag@dvfu.ru</a>
         <span>Ауд. F305</span>
-        <span>Консультации: по субботам, 15:10–16:40</span>
+        <span>Консультации: субботы, 15:10–16:40</span>
       </div>
     </div>
   </div>
 </header>
+<nav class="site-nav">
+  <div class="nav-inner">
+    <a href="https://julian90807-rgb.github.io/canonical-law/" class="nav-link" data-page="home">О курсе</a>
+    <a href="https://julian90807-rgb.github.io/canonical-law/topics.html" class="nav-link" data-page="topics">Занятия</a>
+    <a href="https://julian90807-rgb.github.io/canonical-law/rating.html" class="nav-link" data-page="rating">Рейтинг</a>
+    <a href="https://julian90807-rgb.github.io/canonical-law/library/" class="nav-link" data-page="library">Библиотека</a>
+    <a href="https://julian90807-rgb.github.io/canonical-law/glossary/" class="nav-link" data-page="glossary">Глоссарий</a>
+    <a href="https://julian90807-rgb.github.io/canonical-law/feedback.html" class="nav-link" data-page="feedback">Вопросы и отзывы</a>
+    <a href="https://julian90807-rgb.github.io/canonical-law/submission.html" class="nav-link" data-page="submission">Сдача работ</a>
+  </div>
+</nav>
 
 <!-- ── STICKY NAV ── -->
 <nav class="nav-bar">
@@ -786,7 +823,7 @@
       <h3>Для получения зачёта необходимо одновременно</h3>
       <p>
         <strong>Условие 1.</strong> Набрать рейтинг <strong>не ниже 61%</strong> от максимально возможного.<br>
-        <strong>Условие 2.</strong> В итоговой контрольной работе дать <strong>не менее 6 правильных ответов из 10</strong>.
+        <strong>Условие 2.</strong> По итоговой контрольной работе получить <strong>не менее 6 правильных ответов из 10</strong>.
       </p>
     </div>
   </div>
@@ -825,7 +862,7 @@
       </div>
       <div class="assess-card-body">
         <h4>Контрольная работа</h4>
-        <p>Итоговое задание, оценивающее уровень усвоения материала курса</p>
+        <p>Письменно на бланке. 10 случайных вопросов из тестов всех тем — без вариантов выбора. Минимум 6/10 правильных ответов.</p>
       </div>
     </div>
   </div>
@@ -836,6 +873,13 @@
     <p style="font-family:'Montserrat',sans-serif; font-size:15px; color:var(--navy); margin-top:10px;">
       (0,1 × 80%) + (0,25 × 70%) + (0,25 × 60%) + (0,4 × 60%) = 8 + 17,5 + 15 + 24 = <span class="result">64,5% — зачёт получен ✓</span>
     </p>
+
+  <div class="formula-box" style="margin-top:24px; border-left-color:#742a2a;">
+    <h4>Отработка задолженностей</h4>
+    <p><strong>Семинары:</strong> рукописный ответ на вопросы семинара → сфотографировать → отправить PDF в LMS.</p>
+    <p style="margin-top:8px;"><strong>Тесты и контрольная работа:</strong> один раз, на консультации у преподавателя (суббота, 15:10–16:40, ауд. F305).</p>
+  </div>
+
   </div>
 </section>
 
@@ -930,4 +974,25 @@
 <footer>
   <div class="f-uni">ДВФУ · Кафедра теологии ДФиР ШИГН</div>
   <p>Дальневосточный федеральный университет · Школа искусств и гуманитарных наук</p>
-  <p style="ma
+  <p style="margin-top:6px;">Преподаватель: Руснак А.Г. · rusnak.ag@dvfu.ru · ауд. F305</p>
+</footer>
+
+
+  (function(){
+    var path = window.location.href;
+    document.querySelectorAll('.site-nav .nav-link').forEach(function(a){
+      var pg = a.dataset.page;
+      var patterns = {
+        home:       /canonical-law\/?(\?|#|$)/,
+        topics:     /topics/,
+        rating:     /rating/,
+        library:    /library/,
+        glossary:   /glossary/,
+        feedback:   /feedback/,
+        submission: /submission/
+      };
+      if(patterns[pg] && patterns[pg].test(path)) a.classList.add('active');
+    });
+  })();
+</body>
+</html>

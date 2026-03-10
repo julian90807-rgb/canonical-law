@@ -94,6 +94,32 @@
     .formats { grid-template-columns: 1fr 1fr; }
     .contact-card { flex-direction: column; }
   }
+
+  /* SITE NAV */
+  .site-nav {
+    background: var(--navy);
+    border-bottom: 2px solid rgba(200,150,42,.25);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .nav-inner {
+    max-width: 1000px; margin: 0 auto; padding: 0 24px;
+    display: flex; gap: 0; overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .nav-inner::-webkit-scrollbar { display: none; }
+  .nav-link {
+    display: block; padding: 11px 16px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 10px; font-weight: 600;
+    letter-spacing: .09em; text-transform: uppercase;
+    color: rgba(255,255,255,.55);
+    text-decoration: none; white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: color .2s, border-color .2s;
+  }
+  .nav-link:hover { color: rgba(255,255,255,.9); }
+  .nav-link.active { color: var(--gold); border-bottom-color: var(--gold); }
 </style>
 </head>
 <body>
@@ -106,6 +132,17 @@
     <p class="h-sub">Инструкция по загрузке выполненных заданий семинаров и самостоятельных работ через LMS ДВФУ</p>
   </div>
 </header>
+<nav class="site-nav">
+  <div class="nav-inner">
+    <a href="https://julian90807-rgb.github.io/canonical-law/" class="nav-link" data-page="home">О курсе</a>
+    <a href="https://julian90807-rgb.github.io/canonical-law/topics.html" class="nav-link" data-page="topics">Занятия</a>
+    <a href="https://julian90807-rgb.github.io/canonical-law/rating.html" class="nav-link" data-page="rating">Рейтинг</a>
+    <a href="https://julian90807-rgb.github.io/canonical-law/library/" class="nav-link" data-page="library">Библиотека</a>
+    <a href="https://julian90807-rgb.github.io/canonical-law/glossary/" class="nav-link" data-page="glossary">Глоссарий</a>
+    <a href="https://julian90807-rgb.github.io/canonical-law/feedback.html" class="nav-link" data-page="feedback">Вопросы и отзывы</a>
+    <a href="https://julian90807-rgb.github.io/canonical-law/submission.html" class="nav-link" data-page="submission">Сдача работ</a>
+  </div>
+</nav>
 
 <div class="main">
 
@@ -216,5 +253,23 @@
   <p>Данные обновляются при каждом открытии страницы</p>
 </footer>
 
+
+  // Mark active nav link
+  (function(){
+    var path = window.location.href;
+    document.querySelectorAll('.nav-link').forEach(function(a){
+      var pg = a.dataset.page;
+      var patterns = {
+        home:       /canonical-law\/?(\?|#|$)/,
+        topics:     /topics/,
+        rating:     /rating/,
+        library:    /library/,
+        glossary:   /glossary/,
+        feedback:   /feedback/,
+        submission: /submission/
+      };
+      if(patterns[pg] && patterns[pg].test(path)) a.classList.add('active');
+    });
+  })();
 </body>
 </html>
