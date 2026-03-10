@@ -627,11 +627,13 @@ function splitCsvLine(line) {
 // ── compute scores ────────────────────────────────────────────────────────────
 
 function computeStudents(sec, config) {
-  const wA  = parseFloat(config.weight_attendance) || 0.10;
-  const wS  = parseFloat(config.weight_seminars)   || 0.25;
-  const wT  = parseFloat(config.weight_tests)      || 0.25;
-  const wC  = parseFloat(config.weight_controls)   || 0.40;
-  const cMax = parseFloat(config.control_max)      || 10;
+  const wA   = parseFloat(config.weight_attendance) || 0.10;
+  const wS   = parseFloat(config.weight_seminars)   || 0.25;
+  const wT   = parseFloat(config.weight_tests)      || 0.25;
+  const wC   = parseFloat(config.weight_controls)   || 0.40;
+  const cMax = parseFloat(config.control_max)       || 10;
+  const sMax = parseFloat(config.seminar_max)       || 2;
+  const tMax = parseFloat(config.test_max)          || 1;
 
   const secA = sec['ПОСЕЩЕНИЕ'];
   const secS = sec['СЕМИНАРЫ'];
@@ -660,25 +662,27 @@ function computeStudents(sec, config) {
   const totalCols = secA.headers.length - 1; // excluding ФИО
 
   return names.map(function(name) {
-    // ПОСЕЩЕНИЕ: count non-empty cells / total columns * 100
+    // ПОСЕЩЕНИЕ: сумма 0/1 значений / количество заполненных ячеек * 100
     const aRow = mapA[name] || [];
-    let aCount = 0;
+    let aSum = 0, aFilled = 0;
     for (let i = 1; i < aRow.length; i++) {
-      const v = (aRow[i] || '').trim();
-      if (v !== '') aCount++;
+      const n = parseNum(aRow[i]);
+      if (n !== null) { aSum += n; aFilled++; }
     }
-    const attendance = totalCols > 0 ? (aCount / totalCols) * 100 : null;
+    const attendance = aFilled > 0 ? (aSum / aFilled) * 100 : null;
 
-    // СЕМИНАРЫ: average of non-empty numeric values
+    // СЕМИНАРЫ: среднее заполненных значений (шкала 0–sMax) → переводим в %
     const sRow = mapS[name] || [];
     const sVals = [];
     for (let i = 1; i < sRow.length; i++) {
       const n = parseNum(sRow[i]);
       if (n !== null) sVals.push(n);
     }
-    const seminars = sVals.length > 0 ? sVals.reduce(function(a,b){return a+b;},0) / sVals.length : null;
+    const seminars = sVals.length > 0
+      ? (sVals.reduce(function(a,b){return a+b;},0) / sVals.length) / sMax * 100
+      : null;
 
-    // ТЕСТЫ: average of non-empty Тест 1..N columns; КОНТРОЛЬНАЯ: last column
+    // ТЕСТЫ: среднее заполненных значений (шкала 0–tMax) → переводим в %; КОНТРОЛЬНАЯ: отдельно
     const tcRow = mapTC[name] || [];
     const tcHeaders = secTC.headers;
     const kontrolIdx = tcHeaders.findIndex(function(h){ return h.trim() === 'Контрольная'; });
@@ -688,7 +692,9 @@ function computeStudents(sec, config) {
       const n = parseNum(tcRow[i]);
       if (n !== null) testVals.push(n);
     }
-    const tests = testVals.length > 0 ? testVals.reduce(function(a,b){return a+b;},0) / testVals.length : null;
+    const tests = testVals.length > 0
+      ? (testVals.reduce(function(a,b){return a+b;},0) / testVals.length) / tMax * 100
+      : null;
     const control = kontrolIdx !== -1 ? parseNum(tcRow[kontrolIdx]) : null;
 
     let total = null;
