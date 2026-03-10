@@ -468,7 +468,7 @@
 </div>
 
 <!-- ════════════════════ ПИН-ЭКРАН ════════════════════ -->
-<div id="pin-screen" style="max-width:480px;margin:48px auto;padding:0 24px">
+<div id="pin-screen" style="display:none">
   <div style="background:#fff;border:1px solid var(--border);border-radius:16px;padding:36px 32px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.07)">
     <div style="font-size:36px;margin-bottom:16px">🔐</div>
     <h2 style="font-family:'Playfair Display',serif;font-size:22px;color:var(--navy);margin-bottom:8px">Ваш рейтинг</h2>
@@ -482,7 +482,7 @@
 </div>
 
 <!-- ════════════════════ ТАБЛИЦА ════════════════════ -->
-<div class="table-wrap" id="rating-section" style="display:none">
+<div class="table-wrap" id="rating-section">
   <div class="table-header">
     <div class="table-title">Список студентов</div>
     <div id="status-msg"></div>
@@ -530,9 +530,19 @@ const SHEET_URL = 'https://julian90807-rgb.github.io/dvfu/canonical-law/data/rat
 let allData = [];
 
 window.addEventListener('DOMContentLoaded', function() {
-  // Сначала загружаем данные в фоне, показываем пин-экран
-  loadData();
-  document.getElementById('pin-input').focus();
+  Papa.parse(SHEET_URL, {
+    download: true,
+    header: true,
+    skipEmptyLines: true,
+    complete: function(results) {
+      allData = results.data;
+      showRating(allData, null);
+    },
+    error: function() {
+      document.getElementById('loading-state').style.display = 'none';
+      document.getElementById('error-state').style.display = '';
+    }
+  });
 });
 
 function loadData() {
