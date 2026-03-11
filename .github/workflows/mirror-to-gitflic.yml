@@ -16,7 +16,7 @@ jobs:
 
       - name: Push to GitFlic
         env:
-          GITFLIC_TOKEN: ${{ secrets.GITFLIC_TOKEN }}
+          GITFLIC_PASSWORD: ${{ secrets.GITFLIC_PASSWORD }}
         run: |
-          git remote add gitflic https://mathega:${GITFLIC_TOKEN}@gitflic.ru/project/mathega/dvfu.git
+          git remote add gitflic https://mathega:${GITFLIC_PASSWORD}@gitflic.ru/project/mathega/dvfu.git
           git push gitflic main --force
