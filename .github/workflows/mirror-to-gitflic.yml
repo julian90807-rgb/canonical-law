@@ -14,9 +14,15 @@ jobs:
         with:
           fetch-depth: 0  # full history
 
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.GITFLIC_SSH_KEY }}
+
+      - name: Add GitFlic to known hosts
+        run: ssh-keyscan -H gitflic.ru >> ~/.ssh/known_hosts
+
       - name: Push to GitFlic
-        env:
-          GITFLIC_TOKEN: ${{ secrets.GITFLIC_TOKEN }}
         run: |
-          git remote add gitflic https://mathega:${GITFLIC_TOKEN}@gitflic.ru/project/mathega/dvfu.git
+          git remote add gitflic git@gitflic.ru:project/mathega/dvfu.git
           git push gitflic main --force
