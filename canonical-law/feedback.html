@@ -367,7 +367,7 @@ async function loadFeed() {
   const url = getUrl();
   if (!url) return;
   try {
-    const res  = await fetch(url + '?action=get', { cache: 'no-cache' });
+    const res  = await fetch(url + '?action=get&course=canonical-law', { cache: 'no-cache' });
     const data = await res.json();
     qAll = (data.questions || []).slice().reverse();
     rAll = (data.reviews   || []).slice().reverse();
@@ -464,7 +464,7 @@ async function submitForm(t) {
   if (t === 'q') {
     const text = document.getElementById('text-q').value.trim();
     if (!text) { showMsg('q','err','Пожалуйста, введите текст вопроса.'); return; }
-    payload = { type:'question', anon: nameVal ? 'нет' : 'да', name: displayName, date:now,
+    payload = { type:'question', course:'canonical-law', anon: nameVal ? 'нет' : 'да', name: displayName, date:now,
                 topic: document.getElementById('topic-q').value||'—', text };
   } else {
     const pro  = document.getElementById('pro-r').value.trim();
@@ -472,7 +472,7 @@ async function submitForm(t) {
     const text = document.getElementById('text-r').value.trim();
     if (!pro && !con && !text) { showMsg('r','err','Заполните хотя бы одно поле отзыва.'); return; }
     const star = document.querySelector('input[name="stars"]:checked');
-    payload = { type:'review', anon: nameVal ? 'нет' : 'да', name: displayName, date:now,
+    payload = { type:'review', course:'canonical-law', anon: nameVal ? 'нет' : 'да', name: displayName, date:now,
                 stars:star?star.value:'—', pro:pro||'—', con:con||'—', text:text||'—' };
   }
 
