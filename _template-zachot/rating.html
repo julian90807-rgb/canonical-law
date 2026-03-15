@@ -447,7 +447,6 @@
     <span class="legend-title">Статус:</span>
     <div class="legend-item"><div class="legend-dot pass"></div> Зачёт получен (рейтинг ≥ 61% и контрольная ≥ 6/10)</div>
     <div class="legend-item"><div class="legend-dot fail"></div> Зачёт не получен</div>
-    <div class="legend-item"><div class="legend-dot pending"></div> Семестр продолжается</div>
   </div>
 </div>
 
@@ -674,7 +673,7 @@ function renderTable(students) {
       statusText  = 'Зачёт не получен';
     } else {
       statusClass = 'pending';
-      statusText  = 'Семестр продолжается';
+      statusText  = '—';
     }
 
     const totalClass   = total   === null ? 'pending' : (total   >= passThreshold ? 'pass' : 'fail');
