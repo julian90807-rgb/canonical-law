@@ -585,8 +585,9 @@ function parseRating(text) {
     const raw = lines[i];
     const trimmed = raw.trim();
 
-    // check if line is a section marker
-    const marker = MARKERS.find(m => trimmed === m);
+    // check if line is a section marker (first CSV column may have trailing commas)
+    const firstCol = raw.split(',')[0].trim();
+    const marker = MARKERS.find(m => firstCol === m);
     if (marker) {
       currentSection = marker;
       result[marker] = { headers: [], rows: [] };
@@ -669,7 +670,8 @@ function computeStudents(sec, config) {
       const n = parseNum(aRow[i]);
       if (n !== null) { aSum += n; aFilled++; }
     }
-    const attendance = aFilled > 0 ? (aSum / aFilled) * 100 : null;
+    const totalSessions = (parseFloat(config.lectures) || 5) + (parseFloat(config.seminars) || 5);
+    const attendance = aFilled > 0 ? (aSum / totalSessions) * 100 : null;
 
     // СЕМИНАРЫ: среднее заполненных значений (шкала 0–sMax) → переводим в %
     const sRow = mapS[name] || [];
@@ -678,8 +680,9 @@ function computeStudents(sec, config) {
       const n = parseNum(sRow[i]);
       if (n !== null) sVals.push(n);
     }
+    const totalSeminars = parseFloat(config.seminars) || 5;
     const seminars = sVals.length > 0
-      ? (sVals.reduce(function(a,b){return a+b;},0) / sVals.length) / sMax * 100
+      ? sVals.reduce(function(a,b){return a+b;},0) / (totalSeminars * sMax) * 100
       : null;
 
     // ТЕСТЫ: среднее заполненных значений (шкала 0–tMax) → переводим в %; КОНТРОЛЬНАЯ: отдельно
@@ -692,8 +695,9 @@ function computeStudents(sec, config) {
       const n = parseNum(tcRow[i]);
       if (n !== null) testVals.push(n);
     }
+    const totalTests = parseFloat(config.tests) || 5;
     const tests = testVals.length > 0
-      ? (testVals.reduce(function(a,b){return a+b;},0) / testVals.length) / tMax * 100
+      ? testVals.reduce(function(a,b){return a+b;},0) / (totalTests * tMax) * 100
       : null;
     const control = kontrolIdx !== -1 ? parseNum(tcRow[kontrolIdx]) : null;
 
