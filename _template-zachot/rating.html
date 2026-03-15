@@ -585,8 +585,9 @@ function parseRating(text) {
     const raw = lines[i];
     const trimmed = raw.trim();
 
-    // check if line is a section marker
-    const marker = MARKERS.find(m => trimmed === m);
+    // check if line is a section marker (first CSV column may have trailing commas)
+    const firstCol = raw.split(',')[0].trim();
+    const marker = MARKERS.find(m => firstCol === m);
     if (marker) {
       currentSection = marker;
       result[marker] = { headers: [], rows: [] };
@@ -669,20 +670,22 @@ function computeStudents(sec, config) {
       const n = parseNum(aRow[i]);
       if (n !== null) { aSum += n; aFilled++; }
     }
-    const attendance = aFilled > 0 ? (aSum / aFilled) * 100 : null;
+    const totalSessions = (parseFloat(config.lectures) || 5) + (parseFloat(config.seminars) || 5);
+    const attendance = aFilled > 0 ? (aSum / totalSessions) * 100 : null;
 
-    // СЕМИНАРЫ: среднее заполненных значений (шкала 0–sMax) → переводим в %
+    // СЕМИНАРЫ: сумма / (кол-во семинаров × sMax) → %
     const sRow = mapS[name] || [];
     const sVals = [];
     for (let i = 1; i < sRow.length; i++) {
       const n = parseNum(sRow[i]);
       if (n !== null) sVals.push(n);
     }
+    const totalSeminars = parseFloat(config.seminars) || 5;
     const seminars = sVals.length > 0
-      ? (sVals.reduce(function(a,b){return a+b;},0) / sVals.length) / sMax * 100
+      ? sVals.reduce(function(a,b){return a+b;},0) / (totalSeminars * sMax) * 100
       : null;
 
-    // ТЕСТЫ: среднее заполненных значений (шкала 0–tMax) → переводим в %; КОНТРОЛЬНАЯ: отдельно
+    // ТЕСТЫ: сумма / (кол-во тестов × tMax) → %; КОНТРОЛЬНАЯ: отдельно
     const tcRow = mapTC[name] || [];
     const tcHeaders = secTC.headers;
     const kontrolIdx = tcHeaders.findIndex(function(h){ return h.trim() === 'Контрольная'; });
@@ -692,18 +695,19 @@ function computeStudents(sec, config) {
       const n = parseNum(tcRow[i]);
       if (n !== null) testVals.push(n);
     }
+    const totalTests = parseFloat(config.tests) || 5;
     const tests = testVals.length > 0
-      ? (testVals.reduce(function(a,b){return a+b;},0) / testVals.length) / tMax * 100
+      ? testVals.reduce(function(a,b){return a+b;},0) / (totalTests * tMax) * 100
       : null;
     const control = kontrolIdx !== -1 ? parseNum(tcRow[kontrolIdx]) : null;
 
-    let total = null;
-    if (control !== null) {
-      total = wA * (attendance !== null ? attendance : 0)
-            + wS * (seminars  !== null ? seminars  : 0)
-            + wT * (tests     !== null ? tests     : 0)
-            + wC * (control / cMax * 100);
-    }
+    const hasData = attendance !== null || seminars !== null || tests !== null || control !== null;
+    const total = hasData
+      ? wA * (attendance !== null ? attendance : 0)
+        + wS * (seminars  !== null ? seminars  : 0)
+        + wT * (tests     !== null ? tests     : 0)
+        + wC * (control !== null ? control / cMax * 100 : 0)
+      : null;
 
     return { name, attendance, seminars, tests, control, total };
   });
@@ -714,6 +718,11 @@ function computeStudents(sec, config) {
 function renderTable(students) {
   const passThreshold = parseFloat(cfg.pass_threshold) || 61;
   const controlMin    = parseFloat(cfg.control_min)    || 6;
+  const wA   = parseFloat(cfg.weight_attendance) || 0.10;
+  const wS   = parseFloat(cfg.weight_seminars)   || 0.25;
+  const wT   = parseFloat(cfg.weight_tests)      || 0.25;
+  const wC   = parseFloat(cfg.weight_controls)   || 0.40;
+  const cMax = parseFloat(cfg.control_max)       || 10;
 
   const sorted = [...students].sort(function(a, b) {
     if (a.total === null && b.total === null) return 0;
@@ -746,27 +755,37 @@ function renderTable(students) {
 
     const totalClass   = total   === null ? 'pending' : (total   >= passThreshold ? 'pass' : 'fail');
     const kontrolClass = control === null ? 'na'      : (control >= controlMin    ? 'ok'   : 'bad');
+    const kContrib     = control !== null ? control / cMax * 100 * wC : null;
     const kontrolText  = control === null ? '—' : control + '/10';
 
     const rank = idx < 3 ? rankSymbols[idx] : (idx + 1);
 
-    function scoreCell(val) {
-      if (val === null) return '<td class="score-cell"><span style="color:#bbb">—</span></td>';
-      const cls = val >= 80 ? 'great' : val >= passThreshold ? 'ok' : 'bad';
+    function scoreCell(raw, weight) {
+      if (raw === null) return '<td class="score-cell"><span style="color:#bbb">—</span></td>';
+      const contrib = raw * weight;
+      const maxContrib = weight * 100;
       return '<td class="score-cell"><div class="score-bar-wrap">'
-        + '<span class="score-val">' + val.toFixed(1) + '%</span>'
-        + '<div class="bar-track"><div class="bar-fill" style="width:' + Math.min(val,100).toFixed(0) + '%"></div></div>'
+        + '<span class="score-val">' + contrib.toFixed(1) + '%</span>'
+        + '<div class="bar-track"><div class="bar-fill" style="width:' + (contrib / maxContrib * 100).toFixed(0) + '%"></div></div>'
         + '</div></td>';
+    }
+
+    function kontrolCell() {
+      if (kContrib === null) return '<td><span class="kontrol-cell na">—</span></td>';
+      return '<td><span class="kontrol-cell ' + kontrolClass + '">'
+        + kContrib.toFixed(1) + '%'
+        + '<br><small style="font-weight:400;font-size:10px;opacity:.7">' + kontrolText + '</small>'
+        + '</span></td>';
     }
 
     const tr = document.createElement('tr');
     tr.innerHTML =
       '<td class="col-rank">' + rank + '</td>' +
       '<td class="col-name">' + s.name + '</td>' +
-      scoreCell(s.attendance) +
-      scoreCell(s.seminars) +
-      scoreCell(s.tests) +
-      '<td><span class="kontrol-cell ' + kontrolClass + '">' + kontrolText + '</span></td>' +
+      scoreCell(s.attendance, wA) +
+      scoreCell(s.seminars,   wS) +
+      scoreCell(s.tests,      wT) +
+      kontrolCell() +
       '<td class="col-total"><span class="total-pill ' + totalClass + '">' + (total !== null ? total.toFixed(1) + '%' : '—') + '</span></td>' +
       '<td><span class="status-badge ' + statusClass + '">' + statusText + '</span></td>';
     tbody.appendChild(tr);

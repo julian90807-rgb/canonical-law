@@ -514,7 +514,8 @@ function parseRating(text) {
     const raw = lines[i];
     const trimmed = raw.trim();
 
-    const marker = MARKERS.find(function(m) { return trimmed === m; });
+    const firstCol = raw.split(',')[0].trim();
+    const marker = MARKERS.find(function(m) { return firstCol === m; });
     if (marker) {
       currentSection = marker;
       result[marker] = { headers: [], rows: [] };
