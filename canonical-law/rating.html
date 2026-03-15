@@ -525,11 +525,13 @@
 </footer>
 
 <script>
-const CONFIG_URL = 'https://julian90807-rgb.github.io/dvfu/canonical-law/data/config.csv';
-const RATING_URL = 'https://julian90807-rgb.github.io/dvfu/canonical-law/data/rating.csv';
+const BASE = 'https://julian90807-rgb.github.io/dvfu/canonical-law/data/';
+const CONFIG_URL     = BASE + 'config.csv';
+const ATTENDANCE_URL = BASE + 'attendance.csv';
+const SEMINARS_URL   = BASE + 'seminar_scores.csv';
+const TESTS_URL      = BASE + 'test_scores.csv';
 
 let cfg = {};
-let sections = {};  // { ПОСЕЩЕНИЕ: {headers, rows}, СЕМИНАРЫ: {headers, rows}, 'ТЕСТЫ И КОНТРОЛЬНАЯ': {headers, rows} }
 let studentList = [];
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -573,61 +575,13 @@ function parseConfig(text) {
   return result;
 }
 
-function parseRating(text) {
-  const MARKERS = ['ПОСЕЩЕНИЕ', 'СЕМИНАРЫ', 'ТЕСТЫ И КОНТРОЛЬНАЯ'];
-  const result = {};
-  const lines = text.split(/\r?\n/);
-
-  let currentSection = null;
-  let expectHeaders = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    const raw = lines[i];
-    const trimmed = raw.trim();
-
-    // check if line is a section marker (first CSV column may have trailing commas)
-    const firstCol = raw.split(',')[0].trim();
-    const marker = MARKERS.find(m => firstCol === m);
-    if (marker) {
-      currentSection = marker;
-      result[marker] = { headers: [], rows: [] };
-      expectHeaders = true;
-      continue;
-    }
-
-    if (!currentSection) continue;
-
-    // empty line ends current section
-    if (!trimmed) {
-      currentSection = null;
-      expectHeaders = false;
-      continue;
-    }
-
-    if (expectHeaders) {
-      result[currentSection].headers = splitCsvLine(raw);
-      expectHeaders = false;
-      continue;
-    }
-
-    // data row
-    const cols = splitCsvLine(raw);
-    if (cols.length > 0 && cols[0].trim()) {
-      result[currentSection].rows.push(cols);
-    }
-  }
-
-  return result;
-}
-
-function splitCsvLine(line) {
-  // simple CSV split — no quoted commas in our data
-  return line.split(',');
+function parseFlatCsv(text) {
+  return Papa.parse(text, { header: true, skipEmptyLines: true }).data;
 }
 
 // ── compute scores ────────────────────────────────────────────────────────────
 
-function computeStudents(sec, config) {
+function computeStudents(attendance, seminars, tests, config) {
   const wA   = parseFloat(config.weight_attendance) || 0.10;
   const wS   = parseFloat(config.weight_seminars)   || 0.25;
   const wT   = parseFloat(config.weight_tests)      || 0.25;
@@ -635,82 +589,55 @@ function computeStudents(sec, config) {
   const cMax = parseFloat(config.control_max)       || 10;
   const sMax = parseFloat(config.seminar_max)       || 2;
   const tMax = parseFloat(config.test_max)          || 1;
+  const totalSessions = (parseFloat(config.lectures) || 5) + (parseFloat(config.seminars) || 5);
+  const totalSeminars = parseFloat(config.seminars) || 5;
+  const totalTests    = parseFloat(config.tests)    || 5;
 
-  const secA = sec['ПОСЕЩЕНИЕ'];
-  const secS = sec['СЕМИНАРЫ'];
-  const secTC = sec['ТЕСТЫ И КОНТРОЛЬНАЯ'];
+  const semMap  = {};
+  seminars.forEach(function(r) { if (r['ФИО']) semMap[r['ФИО'].trim()] = r; });
+  const testMap = {};
+  tests.forEach(function(r)    { if (r['ФИО']) testMap[r['ФИО'].trim()] = r; });
 
-  if (!secA || !secS || !secTC) return [];
+  return attendance.map(function(aRow) {
+    const name = (aRow['ФИО'] || '').trim();
+    if (!name) return null;
 
-  // Build name -> row map for each section
-  function buildMap(section) {
-    const map = {};
-    const hIdx = 0; // ФИО is always col 0
-    section.rows.forEach(function(cols) {
-      const name = (cols[0] || '').trim();
-      if (name) map[name] = cols;
-    });
-    return map;
-  }
-
-  const mapA  = buildMap(secA);
-  const mapS  = buildMap(secS);
-  const mapTC = buildMap(secTC);
-
-  // collect all student names (preserve order from ПОСЕЩЕНИЕ section)
-  const names = secA.rows.map(function(r) { return (r[0] || '').trim(); }).filter(Boolean);
-
-  const totalCols = secA.headers.length - 1; // excluding ФИО
-
-  return names.map(function(name) {
-    // ПОСЕЩЕНИЕ: сумма 0/1 значений / количество заполненных ячеек * 100
-    const aRow = mapA[name] || [];
+    // посещение
+    const aKeys = Object.keys(aRow).filter(function(k) { return k !== 'ФИО'; });
     let aSum = 0, aFilled = 0;
-    for (let i = 1; i < aRow.length; i++) {
-      const n = parseNum(aRow[i]);
+    aKeys.forEach(function(k) {
+      const n = parseNum(aRow[k]);
       if (n !== null) { aSum += n; aFilled++; }
-    }
-    const totalSessions = (parseFloat(config.lectures) || 5) + (parseFloat(config.seminars) || 5);
-    const attendance = aFilled > 0 ? (aSum / totalSessions) * 100 : null;
+    });
+    const attendancePct = aFilled > 0 ? aSum / totalSessions * 100 : null;
 
-    // СЕМИНАРЫ: среднее заполненных значений (шкала 0–sMax) → переводим в %
-    const sRow = mapS[name] || [];
-    const sVals = [];
-    for (let i = 1; i < sRow.length; i++) {
-      const n = parseNum(sRow[i]);
-      if (n !== null) sVals.push(n);
-    }
-    const totalSeminars = parseFloat(config.seminars) || 5;
-    const seminars = sVals.length > 0
-      ? sVals.reduce(function(a,b){return a+b;},0) / (totalSeminars * sMax) * 100
+    // семинары
+    const sRow  = semMap[name] || {};
+    const sKeys = Object.keys(sRow).filter(function(k) { return k !== 'ФИО'; });
+    const sVals = sKeys.map(function(k) { return parseNum(sRow[k]); }).filter(function(n) { return n !== null; });
+    const seminarsPct = sVals.length > 0
+      ? sVals.reduce(function(a, b) { return a + b; }, 0) / (totalSeminars * sMax) * 100
       : null;
 
-    // ТЕСТЫ: среднее заполненных значений (шкала 0–tMax) → переводим в %; КОНТРОЛЬНАЯ: отдельно
-    const tcRow = mapTC[name] || [];
-    const tcHeaders = secTC.headers;
-    const kontrolIdx = tcHeaders.findIndex(function(h){ return h.trim() === 'Контрольная'; });
-    const testVals = [];
-    for (let i = 1; i < tcRow.length; i++) {
-      if (i === kontrolIdx) continue;
-      const n = parseNum(tcRow[i]);
-      if (n !== null) testVals.push(n);
-    }
-    const totalTests = parseFloat(config.tests) || 5;
-    const tests = testVals.length > 0
-      ? testVals.reduce(function(a,b){return a+b;},0) / (totalTests * tMax) * 100
+    // тесты и контрольная
+    const tRow  = testMap[name] || {};
+    const tKeys = Object.keys(tRow).filter(function(k) { return k !== 'ФИО' && k !== 'Контрольная'; });
+    const tVals = tKeys.map(function(k) { return parseNum(tRow[k]); }).filter(function(n) { return n !== null; });
+    const testsPct = tVals.length > 0
+      ? tVals.reduce(function(a, b) { return a + b; }, 0) / (totalTests * tMax) * 100
       : null;
-    const control = kontrolIdx !== -1 ? parseNum(tcRow[kontrolIdx]) : null;
+    const control = parseNum(tRow['Контрольная']);
 
-    const hasData = attendance !== null || seminars !== null || tests !== null || control !== null;
+    const hasData = attendancePct !== null || seminarsPct !== null || testsPct !== null || control !== null;
     const total = hasData
-      ? wA * (attendance !== null ? attendance : 0)
-        + wS * (seminars  !== null ? seminars  : 0)
-        + wT * (tests     !== null ? tests     : 0)
-        + wC * (control !== null ? control / cMax * 100 : 0)
+      ? wA * (attendancePct !== null ? attendancePct : 0)
+        + wS * (seminarsPct  !== null ? seminarsPct  : 0)
+        + wT * (testsPct     !== null ? testsPct     : 0)
+        + wC * (control      !== null ? control / cMax * 100 : 0)
       : null;
 
-    return { name, attendance, seminars, tests, control, total };
-  });
+    return { name, attendance: attendancePct, seminars: seminarsPct, tests: testsPct, control, total };
+  }).filter(Boolean);
 }
 
 // ── render ────────────────────────────────────────────────────────────────────
@@ -807,13 +734,20 @@ function loadData() {
   if (btn) btn.classList.add('spinning');
   showState('loading');
 
+  const ts = '?_=' + Date.now();
   Promise.all([
-    fetch(CONFIG_URL + '?_=' + Date.now()).then(function(r){ return r.text(); }),
-    fetch(RATING_URL + '?_=' + Date.now()).then(function(r){ return r.text(); })
+    fetch(CONFIG_URL     + ts).then(function(r){ return r.text(); }),
+    fetch(ATTENDANCE_URL + ts).then(function(r){ return r.text(); }),
+    fetch(SEMINARS_URL   + ts).then(function(r){ return r.text(); }),
+    fetch(TESTS_URL      + ts).then(function(r){ return r.text(); })
   ]).then(function(results) {
     cfg = parseConfig(results[0]);
-    sections = parseRating(results[1]);
-    studentList = computeStudents(sections, cfg);
+    studentList = computeStudents(
+      parseFlatCsv(results[1]),
+      parseFlatCsv(results[2]),
+      parseFlatCsv(results[3]),
+      cfg
+    );
     renderTable(studentList);
     if (btn) btn.classList.remove('spinning');
   }).catch(function(err) {

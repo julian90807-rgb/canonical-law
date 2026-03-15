@@ -453,8 +453,11 @@
 </footer>
 
 <script>
-const CONFIG_URL = 'https://julian90807-rgb.github.io/dvfu/TEMPLATE_SLUG/data/config.csv';
-const RATING_URL = 'https://julian90807-rgb.github.io/dvfu/TEMPLATE_SLUG/data/rating.csv';
+const BASE = 'https://julian90807-rgb.github.io/dvfu/TEMPLATE_SLUG/data/';
+const CONFIG_URL     = BASE + 'config.csv';
+const ATTENDANCE_URL = BASE + 'attendance.csv';
+const SEMINARS_URL   = BASE + 'seminar_scores.csv';
+const TESTS_URL      = BASE + 'test_scores.csv';
 
 let cfg = {};
 
@@ -498,57 +501,13 @@ function parseConfig(text) {
   return result;
 }
 
-function splitCsvLine(line) {
-  return line.split(',');
-}
-
-function parseRating(text) {
-  const MARKERS = ['ПОСЕЩЕНИЕ', 'СЕМИНАРЫ', 'ТЕСТЫ И КОНТРОЛЬНЫЕ'];
-  const result = {};
-  const lines = text.split(/\r?\n/);
-
-  let currentSection = null;
-  let expectHeaders = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    const raw = lines[i];
-    const trimmed = raw.trim();
-
-    const firstCol = raw.split(',')[0].trim();
-    const marker = MARKERS.find(function(m) { return firstCol === m; });
-    if (marker) {
-      currentSection = marker;
-      result[marker] = { headers: [], rows: [] };
-      expectHeaders = true;
-      continue;
-    }
-
-    if (!currentSection) continue;
-
-    if (!trimmed) {
-      currentSection = null;
-      expectHeaders = false;
-      continue;
-    }
-
-    if (expectHeaders) {
-      result[currentSection].headers = splitCsvLine(raw);
-      expectHeaders = false;
-      continue;
-    }
-
-    const cols = splitCsvLine(raw);
-    if (cols.length > 0 && cols[0].trim()) {
-      result[currentSection].rows.push(cols);
-    }
-  }
-
-  return result;
+function parseFlatCsv(text) {
+  return Papa.parse(text, { header: true, skipEmptyLines: true }).data;
 }
 
 // ── compute scores ────────────────────────────────────────────────────────────
 
-function computeStudents(sec, config) {
+function computeStudents(attendance, seminars, tests, config) {
   const wA    = parseFloat(config.weight_attendance) || 0.10;
   const wS    = parseFloat(config.weight_seminars)   || 0.25;
   const wT    = parseFloat(config.weight_tests)      || 0.10;
@@ -558,92 +517,67 @@ function computeStudents(sec, config) {
   const eMax  = parseFloat(config.exam_max)          || 20;
   const sMax  = parseFloat(config.seminar_max)       || 2;
   const tMax  = parseFloat(config.test_max)          || 1;
+  const totalSessions = (parseFloat(config.lectures) || 5) + (parseFloat(config.seminars) || 5);
+  const totalSeminars = parseFloat(config.seminars) || 5;
+  const totalTests    = parseFloat(config.tests)    || 5;
 
-  const secA  = sec['ПОСЕЩЕНИЕ'];
-  const secS  = sec['СЕМИНАРЫ'];
-  const secTC = sec['ТЕСТЫ И КОНТРОЛЬНЫЕ'];
+  const semMap  = {};
+  seminars.forEach(function(r) { if (r['ФИО']) semMap[r['ФИО'].trim()] = r; });
+  const testMap = {};
+  tests.forEach(function(r)    { if (r['ФИО']) testMap[r['ФИО'].trim()] = r; });
 
-  if (!secA || !secS || !secTC) return [];
+  return attendance.map(function(aRow) {
+    const name = (aRow['ФИО'] || '').trim();
+    if (!name) return null;
 
-  function buildMap(section) {
-    const map = {};
-    section.rows.forEach(function(cols) {
-      const name = (cols[0] || '').trim();
-      if (name) map[name] = cols;
-    });
-    return map;
-  }
-
-  const mapA  = buildMap(secA);
-  const mapS  = buildMap(secS);
-  const mapTC = buildMap(secTC);
-
-  const names = secA.rows.map(function(r) { return (r[0] || '').trim(); }).filter(Boolean);
-
-  return names.map(function(name) {
-    // ПОСЕЩЕНИЕ: сумма 0/1 / кол-во заполненных * 100
-    const aRow = mapA[name] || [];
+    // посещение
+    const aKeys = Object.keys(aRow).filter(function(k) { return k !== 'ФИО'; });
     let aSum = 0, aFilled = 0;
-    for (let i = 1; i < aRow.length; i++) {
-      const n = parseNum(aRow[i]);
+    aKeys.forEach(function(k) {
+      const n = parseNum(aRow[k]);
       if (n !== null) { aSum += n; aFilled++; }
-    }
-    const attendance = aFilled > 0 ? (aSum / aFilled) * 100 : null;
+    });
+    const attendancePct = aFilled > 0 ? aSum / totalSessions * 100 : null;
 
-    // СЕМИНАРЫ: среднее (шкала 0–sMax) → %
-    const sRow = mapS[name] || [];
-    const sVals = [];
-    for (let i = 1; i < sRow.length; i++) {
-      const n = parseNum(sRow[i]);
-      if (n !== null) sVals.push(n);
-    }
-    const seminars = sVals.length > 0
-      ? (sVals.reduce(function(a,b){return a+b;},0) / sVals.length) / sMax * 100
+    // семинары
+    const sRow  = semMap[name] || {};
+    const sKeys = Object.keys(sRow).filter(function(k) { return k !== 'ФИО'; });
+    const sVals = sKeys.map(function(k) { return parseNum(sRow[k]); }).filter(function(n) { return n !== null; });
+    const seminarsPct = sVals.length > 0
+      ? sVals.reduce(function(a, b) { return a + b; }, 0) / (totalSeminars * sMax) * 100
       : null;
 
-    // ТЕСТЫ: столбцы начинающиеся с "Тест"
-    // КОНТРОЛЬНЫЕ: столбцы "Контрольная 1", "Контрольная 2"
-    // ЭКЗАМЕН: столбец "Экзамен"
-    const tcRow     = mapTC[name] || [];
-    const tcHeaders = secTC.headers;
+    // тесты, контрольные, экзамен — определяем по имени колонки
+    const tRow      = testMap[name] || {};
+    const testVals  = [];
+    const ctrlVals  = [];
+    let   examRaw   = null;
 
-    const testVals     = [];
-    const controlVals  = [];
-    let   examRaw      = null;
+    Object.keys(tRow).forEach(function(k) {
+      if (k === 'ФИО') return;
+      const n = parseNum(tRow[k]);
+      if (k.indexOf('Тест') === 0)        { if (n !== null) testVals.push(n); }
+      else if (k.indexOf('Контрольная') === 0) { if (n !== null) ctrlVals.push(n); }
+      else if (k === 'Экзамен')           { examRaw = n; }
+    });
 
-    for (let i = 1; i < tcHeaders.length; i++) {
-      const hdr = (tcHeaders[i] || '').trim();
-      const n   = parseNum(tcRow[i]);
-      if (hdr.indexOf('Тест') === 0) {
-        if (n !== null) testVals.push(n);
-      } else if (hdr.indexOf('Контрольная') === 0) {
-        if (n !== null) controlVals.push(n);
-      } else if (hdr === 'Экзамен') {
-        examRaw = n;
-      }
-    }
-
-    const tests = testVals.length > 0
-      ? (testVals.reduce(function(a,b){return a+b;},0) / testVals.length) / tMax * 100
+    const testsPct = testVals.length > 0
+      ? testVals.reduce(function(a, b) { return a + b; }, 0) / (totalTests * tMax) * 100
       : null;
-
-    const controls = controlVals.length > 0
-      ? (controlVals.reduce(function(a,b){return a+b;},0) / controlVals.length) / cMax * 100
+    const controls = ctrlVals.length > 0
+      ? ctrlVals.reduce(function(a, b) { return a + b; }, 0) / (ctrlVals.length * cMax) * 100
       : null;
+    const examPct  = examRaw !== null ? examRaw / eMax * 100 : null;
 
-    const examPct = examRaw !== null ? examRaw / eMax * 100 : null;
+    const semScore = wA * (attendancePct !== null ? attendancePct : 0)
+                   + wS * (seminarsPct   !== null ? seminarsPct   : 0)
+                   + wT * (testsPct      !== null ? testsPct      : 0)
+                   + wC * (controls      !== null ? controls      : 0);
 
-    // Семестровый балл (без экзамена)
-    const semScore = wA * (attendance !== null ? attendance : 0)
-                   + wS * (seminars   !== null ? seminars   : 0)
-                   + wT * (tests      !== null ? tests      : 0)
-                   + wC * (controls   !== null ? controls   : 0);
-
-    // Итоговый рейтинг (только если экзамен сдан)
     const total = examPct !== null ? semScore + wE * examPct : null;
 
-    return { name, attendance, seminars, tests, controls, examRaw, examPct, semScore, total };
-  });
+    return { name, attendance: attendancePct, seminars: seminarsPct, tests: testsPct, controls, examRaw, examPct, semScore, total };
+  }).filter(Boolean);
 }
 
 // ── render ────────────────────────────────────────────────────────────────────
@@ -761,13 +695,20 @@ function loadData() {
   if (btn) btn.classList.add('spinning');
   showState('loading');
 
+  const ts = '?_=' + Date.now();
   Promise.all([
-    fetch(CONFIG_URL + '?_=' + Date.now()).then(function(r){ return r.text(); }),
-    fetch(RATING_URL + '?_=' + Date.now()).then(function(r){ return r.text(); })
+    fetch(CONFIG_URL     + ts).then(function(r){ return r.text(); }),
+    fetch(ATTENDANCE_URL + ts).then(function(r){ return r.text(); }),
+    fetch(SEMINARS_URL   + ts).then(function(r){ return r.text(); }),
+    fetch(TESTS_URL      + ts).then(function(r){ return r.text(); })
   ]).then(function(results) {
     cfg = parseConfig(results[0]);
-    const sections = parseRating(results[1]);
-    const students = computeStudents(sections, cfg);
+    const students = computeStudents(
+      parseFlatCsv(results[1]),
+      parseFlatCsv(results[2]),
+      parseFlatCsv(results[3]),
+      cfg
+    );
     renderTable(students);
     if (btn) btn.classList.remove('spinning');
   }).catch(function(err) {
